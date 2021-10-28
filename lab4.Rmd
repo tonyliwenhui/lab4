@@ -1,0 +1,83 @@
+---
+title: "lab4"
+author: "wenhui li"
+date: "10/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+defense <- read_excel('cyclonesFootball2020.xlsx', sheet='Defensive')
+offensive <- read_excel('cyclonesFootball2020.xlsx', sheet='Offensive')
+biography <- read_excel('cyclonesFootball2020.xlsx', sheet='Biography')
+```
+
+# Part1
+```{r}
+defClean <- defense %>% dplyr::mutate(across(Tackles_Solo:Pass_PB,as.numeric)) %>% mutate(Name = factor(Name)) %>% rename(Opponent = Opponent_Opponent) %>% mutate(Opponent =factor(Opponent))
+offClean <- offensive %>% dplyr::mutate(across(Receiving_REC:Passing_INT,as.numeric)) %>% mutate(Name = factor(Name)) %>% rename(Opponent = Opponent_Opponent) %>% mutate(Opponent =factor(Opponent))
+bioClean <- biography %>% mutate(Weight = as.numeric(Weight)) %>% mutate(Name = factor(Name))
+bioClean <- bioClean %>% separate(Height, into =  c("feet","inches"))
+bioClean <- bioClean %>% mutate(feet = as.numeric(feet),inches = as.numeric(inches)) %>% mutate(Height = 12*feet + inches) %>% select(-feet) %>% select(-inches)
+defClean <- defClean %>% group_by(Name,Opponent) %>% mutate(times = row_number())
+offClean <- offClean %>% group_by(Name,Opponent) %>% mutate(times = row_number())
+str(defClean)
+str(offClean)
+str(bioClean)
+```
+
+# Part2
+## 1
+```{r}
+offCleanLonger <- offClean %>% pivot_longer(Receiving_REC:Passing_INT, names_to = 'stat', values_to = 'score')
+```
+
+## 2
+```{r}
+player <- offCleanLonger %>% group_by(Name,stat) %>% summarize(sum= sum(score))
+player[is.na(player)] =  0
+head(player)
+```
+
+## 3
+```{r}
+ggplot(player,aes(x=Name, y = sum)) +geom_point() + facet_wrap(~stat) + coord_flip()
+```
+
+From the scatterplot I can see that Purdy Brock is good at Passing_YDS, Hutchinson Xavier is good at Receiving_YDS, Hall Breece is good at Rushing_ATT and Rushing_YDS.
+
+## 4
+```{r}
+offCleanWider <- offClean %>% filter(Opponent=="Oregon" | Opponent=="Oklahoma") %>% group_by(Name,Opponent) %>% summarize(meanReceiving = mean(Receiving_YDS, na.rm=TRUE)) %>% pivot_wider(names_from = 'Opponent', values_from = 'meanReceiving') 
+ggplot(offCleanWider,aes(x= Oregon,y=Oklahoma)) + geom_point()+ facet_wrap(~Name)
+```
+
+From the scatterplot I would say ISU have better offense against Oregon.
+
+## 5
+```{r}
+q5 <- bioClean %>% separate(Hometown, into = c("city","state"),sep = ",")
+head(q5)
+```
+
+## 6
+```{r}
+q6 <- q5 %>% group_by(state) %>% summarize(number = n())
+q6
+```
+
+## 7
+```{r}
+purdyOff <- offClean %>% filter(Name == "Purdy, Brock") %>% group_by(Opponent) %>% summarize(purdy = mean(Passing_YDS))
+teamOff <- offClean %>% group_by(Opponent) %>% summarize(numTD = sum(Rushing_TD,na.rm=TRUE))
+plot <- inner_join(purdyOff,teamOff,by='Opponent')
+ggplot(plot,aes(x= purdy,y=numTD)) + geom_point()
+purdyDff <- defClean %>% filter(Name == "Purdy, Brock")
+str(purdyDff)
+```
+
+From the scatter plot I can see that when purdy has more passing yards, ISU team has more number of rushing touch downs. From the str of purdyDff I can see that Purdy has little performance in defense. So, in conclusion, purdy's performance has a possive relationship to ISU team in offense.
